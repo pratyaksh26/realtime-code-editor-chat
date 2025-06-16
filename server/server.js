@@ -1,28 +1,24 @@
 const express = require('express');
 const http = require('http');
+const cors = require('cors');
 const { Server } = require('socket.io');
 const ACTIONS = require('./src/Actions');
-const cors = require('cors');
 
 const app = express();
 const server = http.createServer(app);
 
-// CORS configuration for Render backend to allow Vercel frontend
+// Allow frontend from Vercel to talk to this backend
 const io = new Server(server, {
   cors: {
-    origin: 'https://realtime-code-editor-chat.vercel.app', // your Vercel URL
+    origin: 'https://realtime-code-editor-chat.vercel.app', // ✅ Your Vercel domain
     methods: ['GET', 'POST'],
     credentials: true,
   },
 });
 
-
-
 app.use(cors());
 
 const userSocketMap = {};
-
-// Helper to get all connected clients in a room
 
 function getAllConnectedClients(roomId) {
   return Array.from(io.sockets.adapter.rooms.get(roomId) || []).map(
@@ -32,8 +28,6 @@ function getAllConnectedClients(roomId) {
     })
   );
 }
-
-// Socket.IO logic
 
 io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
@@ -73,7 +67,6 @@ io.on('connection', (socket) => {
       });
     });
     delete userSocketMap[socket.id];
-    socket.leave();
   });
 });
 
