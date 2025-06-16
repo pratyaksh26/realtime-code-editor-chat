@@ -10,18 +10,20 @@ const server = http.createServer(app);
 // CORS configuration for Render backend to allow Vercel frontend
 const io = new Server(server, {
   cors: {
-    origin: 'https://realtime-code-editor-chat.vercel.app',
+    origin: 'https://realtime-code-editor-chat.vercel.app', // your Vercel URL
     methods: ['GET', 'POST'],
     credentials: true,
   },
 });
 
-// Remove static build serving (you're using Vercel for frontend)
+
+
 app.use(cors());
 
 const userSocketMap = {};
 
 // Helper to get all connected clients in a room
+
 function getAllConnectedClients(roomId) {
   return Array.from(io.sockets.adapter.rooms.get(roomId) || []).map(
     (socketId) => ({
@@ -32,6 +34,7 @@ function getAllConnectedClients(roomId) {
 }
 
 // Socket.IO logic
+
 io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
 

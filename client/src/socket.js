@@ -7,5 +7,5 @@ export const initSocket = async () => {
     timeout: 10000,
   };
 
-  return io('https://realtime-code-editor-chat.onrender.com', options); 
+  return io('wss://realtime-code-editor-chat.onrender.com', options);
 };
