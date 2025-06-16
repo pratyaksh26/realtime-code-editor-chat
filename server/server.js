@@ -1,74 +1,77 @@
 const express = require('express');
-const app = express();
 const http = require('http');
-const path = require('path');
 const { Server } = require('socket.io');
 const ACTIONS = require('./src/Actions');
+const cors = require('cors');
 
+const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
 
-app.use(express.static('build'));
-app.use((req, res, next) => {
-    res.sendFile(path.join(__dirname, 'build', 'index.html'));
+// CORS configuration for Render backend to allow Vercel frontend
+const io = new Server(server, {
+  cors: {
+    origin: 'https://realtime-code-editor-chat.vercel.app',
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
 });
+
+// Remove static build serving (you're using Vercel for frontend)
+app.use(cors());
 
 const userSocketMap = {};
+
+// Helper to get all connected clients in a room
 function getAllConnectedClients(roomId) {
-    // Map
-    return Array.from(io.sockets.adapter.rooms.get(roomId) || []).map(
-        (socketId) => {
-            return {
-                socketId,
-                username: userSocketMap[socketId],
-            };
-        }
-    );
+  return Array.from(io.sockets.adapter.rooms.get(roomId) || []).map(
+    (socketId) => ({
+      socketId,
+      username: userSocketMap[socketId],
+    })
+  );
 }
 
+// Socket.IO logic
 io.on('connection', (socket) => {
-    console.log('socket connected', socket.id);
+  console.log('Socket connected:', socket.id);
 
-    socket.on(ACTIONS.JOIN, ({ roomId, username }) => {
-        userSocketMap[socket.id] = username;
-        socket.join(roomId);
-        const clients = getAllConnectedClients(roomId);
-        clients.forEach(({ socketId }) => {
-            io.to(socketId).emit(ACTIONS.JOINED, {
-                clients,
-                username,
-                socketId: socket.id,
-            });
-        });
+  socket.on(ACTIONS.JOIN, ({ roomId, username }) => {
+    userSocketMap[socket.id] = username;
+    socket.join(roomId);
+
+    const clients = getAllConnectedClients(roomId);
+    clients.forEach(({ socketId }) => {
+      io.to(socketId).emit(ACTIONS.JOINED, {
+        clients,
+        username,
+        socketId: socket.id,
+      });
     });
+  });
 
-    socket.on(ACTIONS.CODE_CHANGE, ({ roomId, code }) => {
-        socket.in(roomId).emit(ACTIONS.CODE_CHANGE, { code });
-    });
+  socket.on(ACTIONS.CODE_CHANGE, ({ roomId, code }) => {
+    socket.in(roomId).emit(ACTIONS.CODE_CHANGE, { code });
+  });
 
-    socket.on(ACTIONS.SYNC_CODE, ({ socketId, code }) => {
-        io.to(socketId).emit(ACTIONS.CODE_CHANGE, { code });
-    });
+  socket.on(ACTIONS.SYNC_CODE, ({ socketId, code }) => {
+    io.to(socketId).emit(ACTIONS.CODE_CHANGE, { code });
+  });
 
-    socket.on(ACTIONS.SEND_MSG, ({ roomId, username, text }) => {
+  socket.on(ACTIONS.SEND_MSG, ({ roomId, username, text }) => {
     socket.in(roomId).emit(ACTIONS.RECEIVE_MSG, { username, text });
-});
+  });
 
-
-    
-
-
-    socket.on('disconnecting', () => {
-        const rooms = [...socket.rooms];
-        rooms.forEach((roomId) => {
-            socket.in(roomId).emit(ACTIONS.DISCONNECTED, {
-                socketId: socket.id,
-                username: userSocketMap[socket.id],
-            });
-        });
-        delete userSocketMap[socket.id];
-        socket.leave();
+  socket.on('disconnecting', () => {
+    const rooms = [...socket.rooms];
+    rooms.forEach((roomId) => {
+      socket.in(roomId).emit(ACTIONS.DISCONNECTED, {
+        socketId: socket.id,
+        username: userSocketMap[socket.id],
+      });
     });
+    delete userSocketMap[socket.id];
+    socket.leave();
+  });
 });
 
 const PORT = process.env.PORT || 5000;
